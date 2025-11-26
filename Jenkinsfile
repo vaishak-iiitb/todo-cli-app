@@ -23,8 +23,9 @@ pipeline {
         // 1. Checkout Stage: Pulls the code from GitHub
         stage('Pull Code (Checkout)') {
             steps {
-                // <<< ⚠️ REPLACE YOUR_GITHUB_REPO_URL HERE ⚠️ >>>
-                git 'https://github.com/vaishak-iiitb/todo-cli-app'
+                // You can also add the 'credentialsId' here if you want to be explicit,
+                // but it often defaults correctly from the job configuration.
+                git branch: 'main', url: 'https://github.com/vaishak-iiitb/todo-cli-app'
             }
         }
 
