@@ -24,7 +24,7 @@ pipeline {
         stage('Pull Code (Checkout)') {
             steps {
                 // <<< ⚠️ REPLACE YOUR_GITHUB_REPO_URL HERE ⚠️ >>>
-                git 'YOUR_GITHUB_REPO_URL'
+                git 'https://github.com/vaishak-iiitb/todo-cli-app'
             }
         }
 
