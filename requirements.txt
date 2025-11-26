@@ -4,5 +4,5 @@
 
 # If you were using a framework like Flask or a testing library like pytest, 
 # you would list it here, for example:
-# Flask==2.3.2
-# pytest==7.4.3
+Flask==2.3.2
+pytest==7.4.3
