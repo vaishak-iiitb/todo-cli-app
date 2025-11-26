@@ -1,8 +1,4 @@
-# This file lists the Python packages required for the To-Do List application.
-# The current application uses only standard Python libraries (like 'os' and 'unittest')
-# and therefore has no external dependencies listed.
+# requirements.txt
+# This file lists the Python packages required for the To-Do List application and its tests.
 
-# If you were using a framework like Flask or a testing library like pytest, 
-# you would list it here, for example:
-Flask==2.3.2
-pytest==7.4.3
+pytest
