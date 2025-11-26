@@ -6,7 +6,7 @@ pipeline {
         // --- Placeholders defined ---
         DOCKERHUB_USERNAME = 'vaishak2005'
         ROLL_NUMBER = 'imt2023085'
-        // FIX: Removed trailing whitespace from credential ID
+        // Credential ID (Ensure this matches the ID in Jenkins Credentials)
         DOCKER_CREDS_ID = 'dockerhub-creds' 
         
         IMAGE_NAME = "${DOCKERHUB_USERNAME}/${ROLL_NUMBER}-cli-todo"
@@ -49,26 +49,40 @@ pipeline {
             }
         }
 
-        // 4. Docker Build Stage: FIXES rate limit by logging in BEFORE build
+        // 4. Docker Build Stage: Logs in to bypass rate limits and builds the image.
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image: ${IMAGE_NAME}:latest"
                 
                 script {
-                    // Login to DockerHub using the stored Jenkins credential to use authenticated pull quota
+                    def docker_config_dir = "docker_temp_config_build" // Unique temp config folder
+
+                    // Setup: Create minimal config to disable credential helper
+                    sh """
+                        mkdir -p ${docker_config_dir}
+                        echo '{"credHelpers":{}}' > ${docker_config_dir}/config.json
+                    """
+                    
+                    // Login, Build, and Logout using the temporary config
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         
-                        echo 'Logging into DockerHub to bypass pull rate limits...'
-                        sh "echo \$DOCKER_PASSWORD | ${DOCKER_CLI} login -u \$DOCKER_USERNAME --password-stdin"
-
-                        // Apply DOCKER_BUILDKIT=0 fix and run build
-                        withEnv(["DOCKER_BUILDKIT=0"]) {
+                        withEnv([
+                            "DOCKER_CONFIG=${docker_config_dir}",
+                            "DOCKER_BUILDKIT=0" // Disables BuildKit which often causes credential errors
+                        ]) {
+                            echo 'Logging into DockerHub to bypass pull rate limits...'
+                            sh "echo \$DOCKER_PASSWORD | ${DOCKER_CLI} login -u \$DOCKER_USERNAME --password-stdin"
+                            
+                            echo 'Starting Docker image build...'
                             sh "${DOCKER_CLI} build -t ${IMAGE_NAME}:latest ."
+                            
+                            // Logout immediately
+                            sh "${DOCKER_CLI} logout"
                         }
-                        
-                        // Logout immediately to not carry session state into the next stage
-                        sh "${DOCKER_CLI} logout"
                     }
+                    
+                    // Cleanup: Remove the temporary config folder
+                    sh "rm -rf ${docker_config_dir}"
                 }
                 
                 // Check the image was created
@@ -76,22 +90,32 @@ pipeline {
             }
         }
         
-        // 5. Docker Push Stage: Pushes the image to DockerHub (requires re-login)
+        // 5. Docker Push Stage: Re-logs in to push the built image.
         stage('Push Docker Image to Hub') {
             steps {
                 script {
-                    // Relog in just for the push
+                    def docker_config_dir = "docker_temp_config_push" // Unique temp config folder
+
+                    // Setup: Create minimal config to disable credential helper
+                    sh """
+                        mkdir -p ${docker_config_dir}
+                        echo '{"credHelpers":{}}' > ${docker_config_dir}/config.json
+                    """
+
                     withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         
-                        echo 'Re-logging into DockerHub for push...'
-                        sh "echo \$DOCKER_PASSWORD | ${DOCKER_CLI} login -u \$DOCKER_USERNAME --password-stdin"
-                        
-                        echo "Pushing Docker image ${IMAGE_NAME}:latest..."
-                        sh "${DOCKER_CLI} push ${IMAGE_NAME}:latest"
-                        
-                        // Final logout
-                        sh "${DOCKER_CLI} logout"
+                        withEnv(["DOCKER_CONFIG=${docker_config_dir}"]) {
+                            echo 'Re-logging into DockerHub for push...'
+                            sh "echo \$DOCKER_PASSWORD | ${DOCKER_CLI} login -u \$DOCKER_USERNAME --password-stdin"
+                            
+                            echo "Pushing Docker image ${IMAGE_NAME}:latest..."
+                            sh "${DOCKER_CLI} push ${IMAGE_NAME}:latest"
+                            
+                            sh "${DOCKER_CLI} logout"
+                        }
                     }
+                    // Cleanup: Remove the temporary config folder
+                    sh "rm -rf ${docker_config_dir}"
                 }
             }
         }
